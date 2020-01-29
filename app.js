@@ -19,7 +19,29 @@ var budgetController = (function() {
              * and the context of the function is deleted from execution
              * stack, this values continue to be acessible for the functions.
              */
-            console.log(add(b));
+            return add(b);
         }
     }
 })();
+
+/**
+ * Controller to the interface
+ */
+var uiController = (function() {
+
+})();
+
+
+/**
+ * Controller implementing the conection between the controllers
+ */
+var appController = (function(budgetCtrl, uiCtrl){
+
+    var z = budgetCtrl.publicTest(5);
+
+    return {
+        anotherPublic: function() {
+            console.log(z)
+        }
+    }
+})(budgetController, uiController);
