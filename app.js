@@ -1,4 +1,3 @@
-
 /**
  * BUDGET CONTROLLER
  * 
@@ -13,7 +12,7 @@
 */
 var budgetController = (function () {
 
-    const typeValues = {
+    const types = {
         income: 'inc',
         expense: 'exp'
     }
@@ -24,51 +23,77 @@ var budgetController = (function () {
             inc: []
         },
         totals: {
+            budget: 0,
             exp: 0,
             inc: 0,
             totalPercentExpenses: 0
         }
     };
-    
 
-    var Expense = function(id, description, value) {
+
+    var Expense = function (id, description, value) {
         this.id = id;
         this.description = description;
         this.value = value;
     };
 
-    var Income = function(id, description, value) {
+    var Income = function (id, description, value) {
         this.id = id;
         this.description = description;
         this.value = value;
     };
 
     return {
-        addItem: function(type, description, value) {
+        addItem: function (type, description, value) {
 
             let newItem, ID;
 
             /* Create a new ID */
             ID = data.allItens[type].length > 0 ? data.allItens[type][data.allItens[type].length - 1].id + 1 : 0;
             /* Create a new item */
-            newItem = type === typeValues.expense ? new Expense(ID, description, value) : new Income(ID, description, value);
+            newItem = type === types.expense ? new Expense(ID, description, value) : new Income(ID, description, value);
             /* Push the new item into the array*/
             data.allItens[type].push(newItem)
 
             /* Return the new element */
             return newItem;
         },
-        getBudget: function() {
+        getBudget: function () {
             return data.totals;
         },
-        setBudget: function(totalsUpdated) {
+        setBudget: function (totalsUpdated) {
             data.totals = totalsUpdated;
         },
-        testing: function() {
+        testing: function () {
             console.log(data);
+        },
+        removeItem: function (id, type) {
+
+            data.allItens[type] = data.allItens[type].filter((item) => {
+                return item.id !== id;
+            })
+        },
+        updateBudget: function () {
+            let totalBudget = 0, sumExpenses = 0, sumIncomes = 0;
+
+            data.allItens.exp.forEach( (expense) => {   
+                sumExpenses += expense;
+            });
+
+            data.allItens.inc.forEach( (income) => {
+                sumIncomes += income;
+            })
+
+            totalBudget = sumIncomes - sumExpenses;
+
+            data.totals.inc = sumIncomes;
+            data.totals.exp = sumExpenses;
+            data.totals.budget = totalBudget;
+
         }
     }
 })();
+
 
 /**
  * UI CONTROLLER
@@ -78,13 +103,25 @@ var budgetController = (function () {
  */
 var uiController = (function () {
 
+    const types = {
+        income: 'inc',
+        expense: 'exp'
+    };
+
     const DOMStrings = {
         inputType: '.add__type',
         inputDescription: '.add__description',
         inputValue: '.add__value',
         addButton: '.add__btn',
         incomeContainer: '.income__list',
-        expenseContainer: '.expenses__list'
+        expenseContainer: '.expenses__list',
+        incomeLabel: '.budget__income--value',
+        expenseLabel: '.budget__expenses--value',
+        budgetValue: '.budget__value',
+        expenseTotalPercentage: '.budget__expenses--percentage',
+        container: '.container',
+        containerIncomes: '.income',
+        containerExpenses: '.expenses',
     }
 
     /* Buttom add */
@@ -95,16 +132,18 @@ var uiController = (function () {
     const incomeContainer = document.querySelector(DOMStrings.incomeContainer);
     const expenseContainer = document.querySelector(DOMStrings.expenseContainer);
 
-    const incomeLabel = document.querySelector('.budget__income--value');
-    const expenseLabel = document.querySelector('.budget__expenses--value');
-    const budgetLabel = document.querySelector('.budget__value');
-    const percentExpensesLabel = document.querySelector('.budget__expenses--percentage');
+    const incomeLabel = document.querySelector(DOMStrings.incomeLabel);
+    const budgetLabel = document.querySelector(DOMStrings.budgetValue);
+    const expenseLabel = document.querySelector(DOMStrings.expenseLabel);
+    const percentExpensesLabel = document.querySelector(DOMStrings.expenseTotalPercentage);
 
     function initializeValuesLabels() {
-        incomeLabel.textContent = 0;
-        expenseLabel.textContent = 0;
-        budgetLabel.textContent = 0;
-        percentExpensesLabel.textContent = 0;
+        updateBudgetInterface({
+            budget: 0,
+            inc: 0,
+            exp: 0,
+            totalPercentExpenses: -1
+        });
     }
 
     function setUpEventListeners() {
@@ -119,6 +158,24 @@ var uiController = (function () {
         btnAdd.addEventListener('click', () => {
             addNewItem();
         })
+
+        document.querySelector(DOMStrings.containerExpenses).addEventListener(
+            'click', (event) => { deleteItem(event, types.expense) });
+
+        document.querySelector(DOMStrings.containerIncomes).addEventListener(
+            'click', (event) => { deleteItem(event, types.income) });
+    }
+
+    const deleteItem = function (event, type) {
+        const isIncome = type === types.income;
+        const idItem = event.target.id;
+        
+        if (idItem) {
+            appController.ctrlRemoveItem(idItem, type);
+
+            elementToRemove = isIncome ? document.querySelector(`#${types.income}-${idItem}`) : document.querySelector(`#${types.expense}-${idItem}`);
+            elementToRemove && elementToRemove.parentNode.removeChild(elementToRemove);
+        }
     }
 
     function addNewItem() {
@@ -128,59 +185,57 @@ var uiController = (function () {
             value: parseFloat(inputValue.value)
         }
 
-        if(description !== "" && (!isNaN(values.value) && values.value > 0)){
+        if (description !== "" && (!isNaN(values.value) && values.value > 0)) {
             const newItem = appController.ctrlAddItem(values);
-    
+
             addHtmlListItem(newItem, values.type);
-            updateBudgetInterface();
+
+            const budgetValues = appController.getCurrentBudget();
+            updateBudgetInterface(budgetValues);
             clearFields();
         }
     }
 
     function addHtmlListItem(newItem, type) {
-        let html, newHtml, element;
+        let html, element;
 
         //Create HTML string with placeholder text
-        if(type === 'inc') {
+        if (type === 'inc') {
             element = incomeContainer;
-            html = '<div class="item clearfix" id="income-%id%"><div class="item__description">%description%</div><div class="right clearfix"><div class="item__value">+ %value%</div><div class="item__delete"><button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button></div></div></div>';
-
-        } else if(type === 'exp') {
+            html = `<div class="item clearfix" id="${types.income}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">+ ${newItem.value}</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}"  class="ion-ios-close-outline"></i></button></div></div></div>`;
+        } else if (type === 'exp') {
             element = expenseContainer;
-            html = '<div class="item clearfix" id="expense-%id%"><div class="item__description">%description%</div><div class="right clearfix"><div class="item__value">- %value%</div><div class="item__percentage">21%</div><div class="item__delete"><button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button></div></div></div>';
+            html = `<div class="item clearfix" id="${types.expense}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">- ${newItem.value}</div><div class="item__percentage">21%</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}" class="ion-ios-close-outline"></i></button></div></div></div>`;
         }
 
-        //Replace the placeholder text with actual data
-        newHtml = html.replace('%id%', newItem.id);
-        newHtml = newHtml.replace('%description%', newItem.description);
-        newHtml = newHtml.replace('%value%', newItem.value);
 
-        element.insertAdjacentHTML('beforeend', newHtml);
+        element.insertAdjacentHTML('beforeend', html);
     }
 
-    function updateBudgetInterface() {
-        const { inc, exp, totalPercentExpenses } = appController.getCurrentBudget();
+    function updateBudgetInterface(budgetValues) {
+
+        const { budget, inc, exp, totalPercentExpenses } = budgetValues;
 
         incomeLabel.textContent = inc;
         expenseLabel.textContent = exp;
 
-        budgetLabel.textContent = inc - exp;
-        percentExpensesLabel.textContent = totalPercentExpenses;
+        budgetLabel.textContent = budget;
+        percentExpensesLabel.textContent = totalPercentExpenses >= 0 ? `${totalPercentExpenses}%` : '';
     }
 
-    function clearFields(){
+    function clearFields() {
         let varFields, fildsArr;
-        
+
         varFields = document.querySelectorAll(`${DOMStrings.inputDescription}, ${DOMStrings.inputValue}`);
         fildsArr = Array.prototype.slice.call(varFields);
 
-        fildsArr.forEach( (current, index, array) => {
+        fildsArr.forEach((current, index, array) => {
             current.value = "";
         });
     }
 
     return {
-        init: function() {
+        init: function () {
             initializeValuesLabels();
             setUpEventListeners();
         }
@@ -220,20 +275,22 @@ var appController = (function (budgetCtrl, uiCtrl) {
     function updateBudget(newItem, type) {
         let budget = budgetCtrl.getBudget();
 
-        budget = calculateBudget(budget, newItem, type);
+        budget = calculateBudgetOnInserting(budget, newItem, type);
 
         budgetCtrl.setBudget(budget)
     }
 
-    function calculateBudget(currentBudget, newItem, type) {
+    function calculateBudgetOnInserting(currentBudget, newItem, type) {
         if (type === 'inc') {
             currentBudget.inc += newItem.value;
         } else {
             currentBudget.exp += newItem.value;
         }
 
-        let percent = (currentBudget.exp * 100)/ currentBudget.inc
+        let percent = currentBudget.inc > 0 ? Math.round((currentBudget.exp / currentBudget.inc) * 100) : -1;
+
         currentBudget.totalPercentExpenses = percent;
+        currentBudget.budget = currentBudget.inc - currentBudget.exp;
 
         return currentBudget;
     }
@@ -242,15 +299,27 @@ var appController = (function (budgetCtrl, uiCtrl) {
      * Método de auxílio que realiza a atualização dos gastos e 
      * despesas
      */
-    const getCurrentBudget = function() {
-       return budgetCtrl.getBudget();
+    const getCurrentBudget = function () {
+        return budgetCtrl.getBudget();
+    }
+
+    /**
+     * Método que controla o fluxo de excluir itens
+     */
+    const ctrlRemoveItem = function (itemId, type) {
+        
+        let idInteger = !Number.isInteger(itemId) ? parseInt(itemId) : itemId;
+        budgetController.removeItem(idInteger, type);
     }
 
     return {
         ctrlAddItem: ctrlAddItem,
+        ctrlRemoveItem: ctrlRemoveItem,
         getCurrentBudget: getCurrentBudget
     }
 
 })(budgetController, uiController);
+
+
 
 uiController.init();
