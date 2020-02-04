@@ -61,6 +61,12 @@ var budgetController = (function () {
         getBudget: function () {
             return data.totals;
         },
+        getIncomes: function () {
+            return data.allItens.inc;
+        },
+        getExpenses: function () {
+            return data.allItens.exp;
+        },
         setBudget: function (totalsUpdated) {
             data.totals = totalsUpdated;
         },
@@ -175,6 +181,8 @@ var uiController = (function () {
 
             elementToRemove = isIncome ? document.querySelector(`#${types.income}-${idItem}`) : document.querySelector(`#${types.expense}-${idItem}`);
             elementToRemove && elementToRemove.parentNode.removeChild(elementToRemove);
+
+            updateBudgetInterface();
         }
     }
 
@@ -189,9 +197,7 @@ var uiController = (function () {
             const newItem = appController.ctrlAddItem(values);
 
             addHtmlListItem(newItem, values.type);
-
-            const budgetValues = appController.getCurrentBudget();
-            updateBudgetInterface(budgetValues);
+            updateBudgetInterface();
             clearFields();
         }
     }
@@ -208,13 +214,12 @@ var uiController = (function () {
             html = `<div class="item clearfix" id="${types.expense}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">- ${newItem.value}</div><div class="item__percentage">21%</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}" class="ion-ios-close-outline"></i></button></div></div></div>`;
         }
 
-
         element.insertAdjacentHTML('beforeend', html);
     }
 
-    function updateBudgetInterface(budgetValues) {
+    function updateBudgetInterface() {
 
-        const { budget, inc, exp, totalPercentExpenses } = budgetValues;
+        const { budget, inc, exp, totalPercentExpenses } = appController.getCurrentBudget();
 
         incomeLabel.textContent = inc;
         expenseLabel.textContent = exp;
@@ -280,6 +285,13 @@ var appController = (function (budgetCtrl, uiCtrl) {
         budgetCtrl.setBudget(budget)
     }
 
+    /**
+     * Método acionado na inserção de novas rendas ou gastos.
+     * 
+     * @param {*} currentBudget 
+     * @param {*} newItem 
+     * @param {*} type 
+     */
     function calculateBudgetOnInserting(currentBudget, newItem, type) {
         if (type === 'inc') {
             currentBudget.inc += newItem.value;
@@ -293,6 +305,37 @@ var appController = (function (budgetCtrl, uiCtrl) {
         currentBudget.budget = currentBudget.inc - currentBudget.exp;
 
         return currentBudget;
+    }
+
+    /**
+     * Método para recalcular todos os valores de renda, gastos e 
+     * porcentagem de gastos.
+     * 
+     */
+    function updateBudgetOnRemove () {
+        
+        let totalIncome = 0, totalExpense = 0, budget = 0, percentExpenses = 0;
+
+        const incomes = budgetCtrl.getIncomes();
+        const expenses = budgetCtrl.getExpenses();
+
+        incomes && incomes.forEach( (income) => {
+            totalIncome += income.value;
+        });
+
+        expenses && expenses.forEach( (expense) => {
+            totalExpense += expense.value;
+        });
+
+        budget = totalIncome - totalExpense;
+        percentExpenses = totalExpense > 0 ? Math.round((totalExpense / totalIncome) * 100) : -1;
+
+        budgetCtrl.setBudget({
+            inc: totalIncome,
+            exp: totalExpense,
+            budget: budget,
+            totalPercentExpenses: percentExpenses
+        });
     }
 
     /**
@@ -310,6 +353,8 @@ var appController = (function (budgetCtrl, uiCtrl) {
         
         let idInteger = !Number.isInteger(itemId) ? parseInt(itemId) : itemId;
         budgetController.removeItem(idInteger, type);
+
+        updateBudgetOnRemove();
     }
 
     return {
