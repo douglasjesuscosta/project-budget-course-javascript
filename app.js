@@ -36,6 +36,10 @@ var budgetController = (function () {
         this.description = description;
         this.value = value;
         this.percentExpense = percent;
+
+        Expense.prototype.calcPercentageExpense = function(totalIncome) {
+            this.percentExpense = totalIncome > 0 ? Math.round((this.value / totalIncome) * 100) : -1;
+        }
     };
 
     var Income = function (id, description, value) {
@@ -56,7 +60,7 @@ var budgetController = (function () {
 
             /* Create a new item */
             if(isExpense) {
-                const percentExpense = Math.round((value / data.totals.inc) * 100);
+                const percentExpense = data.totals.inc && data.totals.inc > 0 ? Math.round((value / data.totals.inc) * 100) : -1;
                 newItem = new Expense(ID, description, value, percentExpense); 
             } else {
                 newItem = new Income(ID, description, value)
@@ -195,6 +199,7 @@ var uiController = (function () {
             elementToRemove && elementToRemove.parentNode.removeChild(elementToRemove);
 
             updateBudgetInterface();
+            type === types.income && updatePercentExpenseInterface();
         }
     }
 
@@ -210,6 +215,7 @@ var uiController = (function () {
 
             addHtmlListItem(newItem, values.type);
             updateBudgetInterface();
+            values.type === types.income && updatePercentExpenseInterface();
             clearFields();
         }
     }
@@ -220,10 +226,10 @@ var uiController = (function () {
         //Create HTML string with placeholder text
         if (type === 'inc') {
             element = incomeContainer;
-            html = `<div class="item clearfix" id="${types.income}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">+ ${newItem.value}</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}"  class="ion-ios-close-outline"></i></button></div></div></div>`;
+            html = `<div class="item clearfix" id="${types.income}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">${formatNumber(newItem.value)}</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}"  class="ion-ios-close-outline"></i></button></div></div></div>`;
         } else if (type === 'exp') {
             element = expenseContainer;
-            html = `<div class="item clearfix" id="${types.expense}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">- ${newItem.value}</div><div class="item__percentage">${newItem.percentExpense}</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}" class="ion-ios-close-outline"></i></button></div></div></div>`;
+            html = `<div class="item clearfix" id="${types.expense}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">${formatNumber(newItem.value)}</div><div class="item__percentage" id="percent-${newItem.id}">${newItem.percentExpense}</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}" class="ion-ios-close-outline"></i></button></div></div></div>`;
         }
 
         element.insertAdjacentHTML('beforeend', html);
@@ -240,6 +246,15 @@ var uiController = (function () {
         percentExpensesLabel.textContent = totalPercentExpenses >= 0 ? `${totalPercentExpenses}%` : '';
     }
 
+    function updatePercentExpenseInterface() {
+        const expenses = appController.getExpenses();
+
+        expenses.forEach(expense => {
+            let elementExpense = document.querySelector(`#percent-${expense.id}`);
+            elementExpense.textContent = expense.percentExpense > 0 ? expense.percentExpense + '%' : '--';
+        });
+    }
+
     function clearFields() {
         let varFields, fildsArr;
 
@@ -249,6 +264,19 @@ var uiController = (function () {
         fildsArr.forEach((current, index, array) => {
             current.value = "";
         });
+    }
+
+    function formatNumber(num, type){
+        num = Math.abs(num);
+        num = num.toFixed(2);
+
+        let numSplit, integerPart, decimalPart, sign; 
+        numSplit = num.split('.');
+        integerPart = numSplit[0];
+        decimalPart = numSplit[1];
+
+        integerPart = integerPart.length > 3 ? integerPart.substr(0, integerPart.length - 3) + ',' + integerPart.substr(integerPart.length -3, 3) : integerPart;
+        return `${(type === types.income ? '+' : '-')} ${integerPart}${decimalPart}`;
     }
 
     return {
@@ -281,7 +309,7 @@ var appController = (function (budgetCtrl, uiCtrl) {
         const newItem = budgetCtrl.addItem(type, description, value);
 
         updateBudget(newItem, type);
-        type === 'inc' && updatePercentageExpensesOnChange();
+        type === 'inc' && updatePercentageExpenses();
 
         return newItem;
     }
@@ -298,12 +326,12 @@ var appController = (function (budgetCtrl, uiCtrl) {
         budgetCtrl.setBudget(budget)
     }
 
-    function updatePercentageExpensesOnChange() {
+    function updatePercentageExpenses() {
         const { inc } = budgetController.getBudget();
         let expenses = budgetController.getExpenses();
 
         expenses && expenses.forEach(expense => {
-            expense.percentExpense = inc > 0 ? Math.round((expense.value / inc) * 100) : -1;
+            expense.calcPercentageExpense(inc);
         })
 
         budgetController.setExpenses(expenses);
@@ -379,17 +407,20 @@ var appController = (function (budgetCtrl, uiCtrl) {
         budgetController.removeItem(idInteger, type);
 
         updateBudgetOnRemove();
-        updatePercentageExpensesOnChange();
+        type === 'inc' && updatePercentageExpenses();
+    }
+
+    const getExpenses = function(){
+        return budgetController.getExpenses();
     }
 
     return {
         ctrlAddItem: ctrlAddItem,
         ctrlRemoveItem: ctrlRemoveItem,
-        getCurrentBudget: getCurrentBudget
+        getCurrentBudget: getCurrentBudget,
+        getExpenses: getExpenses
     }
 
 })(budgetController, uiController);
-
-
 
 uiController.init();
