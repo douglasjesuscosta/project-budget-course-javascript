@@ -144,6 +144,7 @@ var uiController = (function () {
         container: '.container',
         containerIncomes: '.income',
         containerExpenses: '.expenses',
+        dateLabel: '.budget__title--month'
     }
 
     /* Buttom add */
@@ -226,10 +227,10 @@ var uiController = (function () {
         //Create HTML string with placeholder text
         if (type === 'inc') {
             element = incomeContainer;
-            html = `<div class="item clearfix" id="${types.income}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">${formatNumber(newItem.value)}</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}"  class="ion-ios-close-outline"></i></button></div></div></div>`;
+            html = `<div class="item clearfix" id="${types.income}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">${formatNumber(newItem.value, types.income)}</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}"  class="ion-ios-close-outline"></i></button></div></div></div>`;
         } else if (type === 'exp') {
             element = expenseContainer;
-            html = `<div class="item clearfix" id="${types.expense}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">${formatNumber(newItem.value)}</div><div class="item__percentage" id="percent-${newItem.id}">${newItem.percentExpense}</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}" class="ion-ios-close-outline"></i></button></div></div></div>`;
+            html = `<div class="item clearfix" id="${types.expense}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">${formatNumber(newItem.value, types.expense)}</div><div class="item__percentage" id="percent-${newItem.id}">${newItem.percentExpense}</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}" class="ion-ios-close-outline"></i></button></div></div></div>`;
         }
 
         element.insertAdjacentHTML('beforeend', html);
@@ -239,10 +240,12 @@ var uiController = (function () {
 
         const { budget, inc, exp, totalPercentExpenses } = appController.getCurrentBudget();
 
-        incomeLabel.textContent = inc;
-        expenseLabel.textContent = exp;
+        const typeBudget = budget > 0 ? types.income : types.expense;
 
-        budgetLabel.textContent = budget;
+        incomeLabel.textContent = formatNumber(inc, types.income);
+        expenseLabel.textContent = formatNumber(exp, types.expense);
+
+        budgetLabel.textContent = formatNumber(budget, typeBudget);
         percentExpensesLabel.textContent = totalPercentExpenses >= 0 ? `${totalPercentExpenses}%` : '';
     }
 
@@ -276,7 +279,17 @@ var uiController = (function () {
         decimalPart = numSplit[1];
 
         integerPart = integerPart.length > 3 ? integerPart.substr(0, integerPart.length - 3) + ',' + integerPart.substr(integerPart.length -3, 3) : integerPart;
-        return `${(type === types.income ? '+' : '-')} ${integerPart}${decimalPart}`;
+        return `${(type === types.income ? '+' : '-')} ${integerPart}.${decimalPart}`;
+    }
+
+    function displayMonth() {
+        var now, year;
+
+        now = new Date();
+        year = now.getFullYear();
+
+        document.querySelector(DOMStrings.dateLabel).textContent = year;
+
     }
 
     return {
