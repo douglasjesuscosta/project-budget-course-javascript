@@ -31,10 +31,11 @@ var budgetController = (function () {
     };
 
 
-    var Expense = function (id, description, value) {
+    var Expense = function (id, description, value, percent = 0) {
         this.id = id;
         this.description = description;
         this.value = value;
+        this.percentExpense = percent;
     };
 
     var Income = function (id, description, value) {
@@ -46,12 +47,21 @@ var budgetController = (function () {
     return {
         addItem: function (type, description, value) {
 
-            let newItem, ID;
+            let newItem, ID, isExpense;
+
+            isExpense = type === types.expense;
 
             /* Create a new ID */
             ID = data.allItens[type].length > 0 ? data.allItens[type][data.allItens[type].length - 1].id + 1 : 0;
+
             /* Create a new item */
-            newItem = type === types.expense ? new Expense(ID, description, value) : new Income(ID, description, value);
+            if(isExpense) {
+                const percentExpense = Math.round((value / data.totals.inc) * 100);
+                newItem = new Expense(ID, description, value, percentExpense); 
+            } else {
+                newItem = new Income(ID, description, value)
+            }
+
             /* Push the new item into the array*/
             data.allItens[type].push(newItem)
 
@@ -66,6 +76,9 @@ var budgetController = (function () {
         },
         getExpenses: function () {
             return data.allItens.exp;
+        },
+        setExpenses: function(expenses) {
+            data.allItens.exp = expenses;  
         },
         setBudget: function (totalsUpdated) {
             data.totals = totalsUpdated;
@@ -82,11 +95,11 @@ var budgetController = (function () {
         updateBudget: function () {
             let totalBudget = 0, sumExpenses = 0, sumIncomes = 0;
 
-            data.allItens.exp.forEach( (expense) => {   
+            data.allItens.exp.forEach((expense) => {
                 sumExpenses += expense;
             });
 
-            data.allItens.inc.forEach( (income) => {
+            data.allItens.inc.forEach((income) => {
                 sumIncomes += income;
             })
 
@@ -108,11 +121,10 @@ var budgetController = (function () {
  * values to interface and also listening to events on its buttons.
  */
 var uiController = (function () {
-
     const types = {
         income: 'inc',
         expense: 'exp'
-    };
+    }
 
     const DOMStrings = {
         inputType: '.add__type',
@@ -175,7 +187,7 @@ var uiController = (function () {
     const deleteItem = function (event, type) {
         const isIncome = type === types.income;
         const idItem = event.target.id;
-        
+
         if (idItem) {
             appController.ctrlRemoveItem(idItem, type);
 
@@ -211,7 +223,7 @@ var uiController = (function () {
             html = `<div class="item clearfix" id="${types.income}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">+ ${newItem.value}</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}"  class="ion-ios-close-outline"></i></button></div></div></div>`;
         } else if (type === 'exp') {
             element = expenseContainer;
-            html = `<div class="item clearfix" id="${types.expense}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">- ${newItem.value}</div><div class="item__percentage">21%</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}" class="ion-ios-close-outline"></i></button></div></div></div>`;
+            html = `<div class="item clearfix" id="${types.expense}-${newItem.id}"><div class="item__description">${newItem.description}</div><div class="right clearfix"><div class="item__value">- ${newItem.value}</div><div class="item__percentage">${newItem.percentExpense}</div><div class="item__delete"><button class="item__delete--btn"><i id="${newItem.id}" class="ion-ios-close-outline"></i></button></div></div></div>`;
         }
 
         element.insertAdjacentHTML('beforeend', html);
@@ -269,6 +281,7 @@ var appController = (function (budgetCtrl, uiCtrl) {
         const newItem = budgetCtrl.addItem(type, description, value);
 
         updateBudget(newItem, type);
+        type === 'inc' && updatePercentageExpensesOnChange();
 
         return newItem;
     }
@@ -283,6 +296,17 @@ var appController = (function (budgetCtrl, uiCtrl) {
         budget = calculateBudgetOnInserting(budget, newItem, type);
 
         budgetCtrl.setBudget(budget)
+    }
+
+    function updatePercentageExpensesOnChange() {
+        const { inc } = budgetController.getBudget();
+        let expenses = budgetController.getExpenses();
+
+        expenses && expenses.forEach(expense => {
+            expense.percentExpense = inc > 0 ? Math.round((expense.value / inc) * 100) : -1;
+        })
+
+        budgetController.setExpenses(expenses);
     }
 
     /**
@@ -312,23 +336,23 @@ var appController = (function (budgetCtrl, uiCtrl) {
      * porcentagem de gastos.
      * 
      */
-    function updateBudgetOnRemove () {
-        
+    function updateBudgetOnRemove() {
+
         let totalIncome = 0, totalExpense = 0, budget = 0, percentExpenses = 0;
 
         const incomes = budgetCtrl.getIncomes();
         const expenses = budgetCtrl.getExpenses();
 
-        incomes && incomes.forEach( (income) => {
+        incomes && incomes.forEach((income) => {
             totalIncome += income.value;
         });
 
-        expenses && expenses.forEach( (expense) => {
+        expenses && expenses.forEach((expense) => {
             totalExpense += expense.value;
         });
 
         budget = totalIncome - totalExpense;
-        percentExpenses = totalExpense > 0 ? Math.round((totalExpense / totalIncome) * 100) : -1;
+        percentExpenses = totalIncome > 0 ? Math.round((totalExpense / totalIncome) * 100) : -1;
 
         budgetCtrl.setBudget({
             inc: totalIncome,
@@ -350,11 +374,12 @@ var appController = (function (budgetCtrl, uiCtrl) {
      * Método que controla o fluxo de excluir itens
      */
     const ctrlRemoveItem = function (itemId, type) {
-        
+
         let idInteger = !Number.isInteger(itemId) ? parseInt(itemId) : itemId;
         budgetController.removeItem(idInteger, type);
 
         updateBudgetOnRemove();
+        updatePercentageExpensesOnChange();
     }
 
     return {
