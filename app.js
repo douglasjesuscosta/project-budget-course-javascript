@@ -130,6 +130,8 @@ var uiController = (function () {
         expense: 'exp'
     }
 
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
     const DOMStrings = {
         inputType: '.add__type',
         inputDescription: '.add__description',
@@ -187,6 +189,16 @@ var uiController = (function () {
 
         document.querySelector(DOMStrings.containerIncomes).addEventListener(
             'click', (event) => { deleteItem(event, types.income) });
+
+        document.querySelector(DOMStrings.inputType).addEventListener('change', onChangeType);
+    }
+
+    const onChangeType = function() {
+
+        inputValue.classList.toggle('red-focus');
+        inputDescription.classList.toggle('red-focus');
+        inputType.classList.toggle('red-focus');
+        btnAdd.classList.toggle('red');
     }
 
     const deleteItem = function (event, type) {
@@ -283,12 +295,13 @@ var uiController = (function () {
     }
 
     function displayMonth() {
-        var now, year;
+        var now, year, month;
 
         now = new Date();
         year = now.getFullYear();
+        month = now.getMonth();
 
-        document.querySelector(DOMStrings.dateLabel).textContent = year;
+        document.querySelector(DOMStrings.dateLabel).textContent = `${months[month]} ${year}`;
 
     }
 
@@ -296,6 +309,7 @@ var uiController = (function () {
         init: function () {
             initializeValuesLabels();
             setUpEventListeners();
+            displayMonth();
         }
     }
 })();
